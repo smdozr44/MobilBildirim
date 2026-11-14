@@ -22,12 +22,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          
 
       - name: Kurulum
         run: |
           pip install playwright
           python -m playwright install --with-deps chromium
+
+      - name: Baglanti testi
+        continue-on-error: true
+        run: curl -sS -o /dev/null -m 30 -w "HTTP %{http_code} - sure %{time_total} sn\n" https://kariyerkapisi.gov.tr/isealim
 
       - name: Ilanlari tara
         env:
