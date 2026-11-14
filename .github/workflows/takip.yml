@@ -1,0 +1,57 @@
+name: Kariyer Kapisi Takip
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # 30 dakikada bir
+  workflow_dispatch:          # elle de çalıştırılabilir
+
+permissions:
+  contents: write
+
+concurrency:
+  group: takip
+  cancel-in-progress: false
+
+jobs:
+  takip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Kurulum
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Ilanlari tara
+        env:
+          NTFY_KONU: ${{ secrets.NTFY_KONU }}
+        run: python kariyerkapisi_takip.py --once --ayrinti
+
+      - name: Hata ayiklama dosyalari
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug
+          path: |
+            debug_liste.html
+            debug_liste.png
+          if-no-files-found: ignore
+
+      - name: Gorulen ilanlari kaydet
+        run: |
+          if [ -f gorulen_ilanlar.json ]; then
+            git config user.name "takip-bot"
+            git config user.email "takip-bot@users.noreply.github.com"
+            git add gorulen_ilanlar.json
+            if ! git diff --cached --quiet; then
+              git commit -m "gorulen ilanlar guncellendi"
+              git push
+            fi
+          fi
