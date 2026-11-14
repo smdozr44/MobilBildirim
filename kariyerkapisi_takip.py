@@ -272,13 +272,23 @@ def ilanlari_tara(gorunur: bool = False) -> list[dict]:
         page = ctx.new_page()
 
         # Sorun giderme: sayfanın arka planda yaptığı veri isteklerini kaydet
+        bekleyen = {}
+
+        def _istek(r):
+            if r.resource_type in ("xhr", "fetch") and "google" not in r.url:
+                bekleyen[id(r)] = f"{r.method} {r.url[:160]}"
+                dlog(f"AĞ İSTEK {r.method} {r.url[:160]}")
+
         def _yanit(r):
             if r.request.resource_type in ("xhr", "fetch"):
+                bekleyen.pop(id(r.request), None)
                 dlog(f"AĞ {r.status} {r.request.method} {r.url[:160]}")
 
         def _hata(r):
+            bekleyen.pop(id(r), None)
             dlog(f"AĞ HATA {r.method} {r.url[:160]} -> {r.failure}")
 
+        page.on("request", _istek)
         page.on("response", _yanit)
         page.on("requestfailed", _hata)
         page.on("console", lambda m: dlog(f"KONSOL {m.type}: {m.text[:160]}") if m.type == "error" else None)
@@ -293,6 +303,10 @@ def ilanlari_tara(gorunur: bool = False) -> list[dict]:
         dlog(f"Listede {len(hedefler)} 'Başvur' butonu bulundu.")
         if not hedefler:
             dlog("Hiç 'Başvur' butonu bulunamadı (ya ilan yok ya da sayfa yapısı farklı).")
+            for b in bekleyen.values():
+                dlog(f"BEKLEYEN istek (cevap gelmedi): {b}")
+            if not bekleyen:
+                dlog("Sayfa ilan verisi için hiç istek göndermedi.")
             hata_ayiklama_kaydet(page)
             browser.close()
             return []
