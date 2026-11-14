@@ -37,8 +37,11 @@ from urllib.parse import urljoin
 # ---------------------------- AYARLAR ----------------------------
 URL = "https://kariyerkapisi.gov.tr/isealim"
 ANAHTAR_KELIMELER = [
+    "tekniker",
+    "bilgisayar",
     "bilgisayar programcılığı",
     "bilgisayar teknikeri",
+    "bilgi işlem",
 ]
 KONTROL_ARALIGI_DK = 30
 # Telefon bildirimi (ntfy.sh). Telefonda ntfy uygulamasını kurup bu konuya abone ol.
@@ -186,7 +189,7 @@ def listeye_git(page, sayfa_no: int) -> None:
     page.goto(URL, wait_until="domcontentloaded", timeout=90_000)
     try:
         # İlan listesi sayfa açıldıktan sonra yüklenir; 'Başvur' butonu görünene kadar bekle
-        page.wait_for_selector("text=/Başvur/i", timeout=30_000)
+        page.wait_for_selector("text=/Başvur/i", timeout=45_000)
     except Exception:
         pass
     page.wait_for_timeout(2500)
@@ -267,6 +270,19 @@ def ilanlari_tara(gorunur: bool = False) -> list[dict]:
             "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         )
         page = ctx.new_page()
+
+        # Sorun giderme: sayfanın arka planda yaptığı veri isteklerini kaydet
+        def _yanit(r):
+            if r.request.resource_type in ("xhr", "fetch"):
+                dlog(f"AĞ {r.status} {r.request.method} {r.url[:160]}")
+
+        def _hata(r):
+            dlog(f"AĞ HATA {r.method} {r.url[:160]} -> {r.failure}")
+
+        page.on("response", _yanit)
+        page.on("requestfailed", _hata)
+        page.on("console", lambda m: dlog(f"KONSOL {m.type}: {m.text[:160]}") if m.type == "error" else None)
+
         try:
             listeye_git(page, 0)
         except Exception:
