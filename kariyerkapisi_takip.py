@@ -183,7 +183,12 @@ def sonraki_sayfa(page) -> bool:
 
 
 def listeye_git(page, sayfa_no: int) -> None:
-    page.goto(URL, wait_until="networkidle", timeout=60_000)
+    page.goto(URL, wait_until="domcontentloaded", timeout=90_000)
+    try:
+        # İlan listesi sayfa açıldıktan sonra yüklenir; 'Başvur' butonu görünene kadar bekle
+        page.wait_for_selector("text=/Başvur/i", timeout=30_000)
+    except Exception:
+        pass
     page.wait_for_timeout(2500)
     for _ in range(sayfa_no):
         if not sonraki_sayfa(page):
@@ -262,7 +267,11 @@ def ilanlari_tara(gorunur: bool = False) -> list[dict]:
             "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         )
         page = ctx.new_page()
-        listeye_git(page, 0)
+        try:
+            listeye_git(page, 0)
+        except Exception:
+            hata_ayiklama_kaydet(page)
+            raise
 
         hedefler = hedefleri_topla(page)
         dlog(f"Listede {len(hedefler)} 'Başvur' butonu bulundu.")
@@ -288,7 +297,7 @@ def ilanlari_tara(gorunur: bool = False) -> list[dict]:
                 href = h["href"]
                 if href and not href.startswith(("javascript", "#")):
                     detay = ctx.new_page()
-                    detay.goto(urljoin(URL, href), wait_until="networkidle", timeout=60_000)
+                    detay.goto(urljoin(URL, href), wait_until="domcontentloaded", timeout=90_000)
                 else:
                     listeye_git(page, h["sayfa"])
                     btn = basvur_butonlari(page).nth(h["idx"])
@@ -296,13 +305,13 @@ def ilanlari_tara(gorunur: bool = False) -> list[dict]:
                         with ctx.expect_page(timeout=4000) as yeni:
                             btn.click()
                         detay = yeni.value
-                        detay.wait_for_load_state("networkidle")
+                        detay.wait_for_load_state("domcontentloaded")
                     except Exception:
                         detay = page  # aynı sekmede açıldı
                         btn.click()
-                        page.wait_for_load_state("networkidle")
+                        page.wait_for_load_state("domcontentloaded")
 
-                detay.wait_for_timeout(1500)
+                detay.wait_for_timeout(4000)
                 url = detay.url
                 if "giris.turkiye.gov.tr" in url or "e-devlet" in normalize(url):
                     dlog(f"UYARI: ilan {n} e-Devlet giriş sayfasına yönlendirdi; ilan metni okunamıyor.")
